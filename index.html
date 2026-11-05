@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Supermercado 3D</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: lienzo 3D a pantalla completa; ficha de opción arriba, barra de opciones y vistas abajo */
+:root{
+  --bg:#e9ecef; --panel:rgba(255,255,255,.93); --fg:#15171c; --muted:#5b6170;
+  --line:rgba(21,23,28,.12); --accent:#2337c6; --sign:#f5c518; --ok:#1f8a4c; --warn:#b5530f;
+  --display:"Archivo",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#14161b; --panel:rgba(24,27,34,.92); --fg:#eef0f4; --muted:#a2a8b6; --line:rgba(255,255,255,.14); --accent:#7d8cff; --ok:#4cc781; --warn:#f0954f; color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#14161b; --panel:rgba(24,27,34,.92); --fg:#eef0f4; --muted:#a2a8b6; --line:rgba(255,255,255,.14); --accent:#7d8cff; --ok:#4cc781; --warn:#f0954f; color-scheme:dark}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--display);overflow:hidden}
+#stage{position:fixed;inset:0}
+#stage canvas{display:block;touch-action:none}
+.card{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:max(16px,env(safe-area-inset-left,0px));
+  background:var(--panel);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:10px;padding:12px 14px;
+  width:min(330px,calc(100vw - 32px));display:flex;flex-direction:column;gap:8px}
+.head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.eyebrow{font:500 11px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;gap:8px;align-items:center}
+.eyebrow i{width:10px;height:10px;background:var(--sign);display:inline-block;border-radius:2px}
+h1{margin:4px 0 0;font-size:19px;font-weight:800;letter-spacing:-.01em;text-wrap:balance}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.stat{border:1px solid var(--line);border-radius:8px;padding:6px 8px;min-width:0}
+.stat b{display:block;font:500 15px/1.1 var(--mono);font-variant-numeric:tabular-nums}
+.stat span{font:400 10px/1.2 var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.stat.ok b{color:var(--ok)} .stat.warn b{color:var(--warn)}
+.pc{font-size:12.5px;line-height:1.45;margin:0;padding-left:16px}
+.pc li::marker{font-weight:700}
+.pc .p::marker{content:"+  ";color:var(--ok)} .pc .c::marker{content:"–  ";color:var(--warn)}
+.slider{display:flex;align-items:center;gap:8px;font:400 11px/1 var(--mono);color:var(--muted)}
+.slider input{flex:1;accent-color:var(--accent)}
+.slider output{font-variant-numeric:tabular-nums;color:var(--fg);min-width:48px;text-align:right}
+.note{font:400 10.5px/1.4 var(--mono);color:var(--muted)}
+.collapse{font:600 11px/1 var(--mono);padding:6px 8px}
+.card .body{display:flex;flex-direction:column;gap:8px}
+.card.min .body{display:none}
+.bar{position:fixed;left:0;right:0;bottom:0;padding:10px max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
+  display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
+.row{display:flex;flex-wrap:wrap;justify-content:center;gap:4px;pointer-events:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:5px;backdrop-filter:blur(8px)}
+.row .lbl{font:500 10px/1 var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);align-self:center;padding:0 6px}
+button{font:600 13px/1 var(--display);color:var(--fg);background:transparent;border:1px solid transparent;border-radius:8px;padding:9px 11px;cursor:pointer}
+button:hover{border-color:var(--line)}
+button[aria-pressed="true"]{background:var(--accent);color:#fff}
+.opt[aria-pressed="true"]{background:var(--sign);color:#15171c}
+.hint{font:500 11.5px/1.3 var(--mono);color:#15171c;background:var(--sign);padding:7px 12px;border-radius:999px;text-align:center;pointer-events:auto}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+</head>
+<body>
+
+<div id="stage"></div>
+
+<div class="card" id="card">
+  <div class="head">
+    <div>
+      <div class="eyebrow"><i></i><span id="eb">Cigarrera BAT</span></div>
+      <h1 id="optTitle">Posición libre</h1>
+    </div>
+    <button class="collapse" id="collapse" aria-expanded="true">Ocultar</button>
+  </div>
+  <div class="body">
+    <div class="stats">
+      <div class="stat" id="sDist"><b id="vDist">–</b><span>Cajero ↔ rack</span></div>
+      <div class="stat" id="sTop"><b id="vTop">–</b><span>Borde superior</span></div>
+      <div class="stat"><b id="vVis">–</b><span>Frente mira a</span></div>
+    </div>
+    <ul class="pc" id="pc"></ul>
+    <label class="slider" for="hBase">Altura base
+      <input type="range" id="hBase" min="1.0" max="1.9" step="0.05" value="1.25">
+      <output id="hOut">1.25 m</output>
+    </label>
+    <div class="note" id="note"></div>
+  </div>
+</div>
+
+<div class="bar">
+  <div class="hint" id="mvHint" hidden>Arrastra la cigarrera sobre el piso · toca Mover otra vez para girar la cámara</div>
+  <div class="row" role="toolbar" aria-label="Ubicación de la cigarrera">
+    <span class="lbl">Ubicación</span>
+    <span class="lbl">Modelo</span>
+    <button class="opt" id="m-simple" data-model="simple" aria-pressed="true">Simple</button>
+    <button class="opt" id="m-transf" data-model="transformer" aria-pressed="false">Transformer</button>
+    <button id="mv" aria-pressed="false">Mover</button>
+    <button id="rl" aria-label="Girar 45 grados a la izquierda">↺ 45°</button>
+    <button id="rr" aria-label="Girar 45 grados a la derecha">↻ 45°</button>
+  </div>
+  <div class="row" role="toolbar" aria-label="Vistas">
+    <button id="v-gen" data-view="general" aria-pressed="true">General</button>
+    <button id="v-cli" data-view="cliente">Cliente</button>
+    <button id="v-caj" data-view="cajero">Ojos cajera</button>
+    <button id="v-rack" data-view="rack">Posterior</button>
+    <button id="v-lat" data-view="lateral">Lateral</button>
+    <button id="v-pla" data-view="planta">Planta</button>
+    <button id="t-prod" aria-pressed="false">Productos</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const stage=document.getElementById('stage');
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputEncoding=THREE.sRGBEncoding; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.05;
+stage.appendChild(renderer.domElement);
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0xdfe6ee);
+const camera=new THREE.PerspectiveCamera(55,1,0.05,200);
+const controls=new THREE.OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true; controls.maxPolarAngle=Math.PI*0.495; controls.minDistance=0.6; controls.maxDistance=60;
+
+// ---------- Materiales ----------
+const M=(c,o={})=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:.6,metalness:0},o));
+const mat={
+  blue:M(0x1f2fc4,{roughness:.35}), dark:M(0x2a2c31,{roughness:.5}), black:M(0x121316,{roughness:.45,metalness:.2}),
+  steel:M(0x9aa0a8,{metalness:.6,roughness:.35}), shelf:M(0x6e737b,{metalness:.4,roughness:.45}),
+  white:M(0xf4f5f7,{roughness:.8}), truss:M(0xf2f3f5,{roughness:.5}), yellow:M(0xf5c518,{roughness:.5}),
+  glass:new THREE.MeshPhysicalMaterial({color:0xcfe6ef,roughness:.05,transparent:true,opacity:.45}),
+  lightBar:M(0x111111), lightOn:new THREE.MeshBasicMaterial({color:0xffffff}), pallet:M(0xb7672f,{roughness:.9}),
+  red:M(0xc8201e), sky:new THREE.MeshBasicMaterial({color:0xcfe8ff}), screen:M(0xffffff,{emissive:0xdfe8ff,emissiveIntensity:.3})
+};
+function box(w,h,d,m,x,y,z,parent=scene,shadow=true){
+  const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m); b.position.set(x,y,z);
+  b.castShadow=shadow; b.receiveShadow=true; parent.add(b); return b;
+}
+
+// ---------- Piso y muros ----------
+const W=34, D=28, H=7.5, Z0=-4;
+(function(){
+  const c=document.createElement('canvas'); c.width=c.height=256; const g=c.getContext('2d');
+  g.fillStyle='#ece3d4'; g.fillRect(0,0,256,256);
+  for(let i=0;i<40;i++){g.fillStyle=`rgba(255,255,255,${Math.random()*.08})`;g.fillRect(Math.random()*256,Math.random()*256,40,40);}
+  g.strokeStyle='#d6cbb9'; g.lineWidth=3; g.strokeRect(0,0,256,256);
+  const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(W/0.8,D/0.8); t.encoding=THREE.sRGBEncoding;
+  t.anisotropy=renderer.capabilities.getMaxAnisotropy();
+  const f=new THREE.Mesh(new THREE.PlaneGeometry(W,D),new THREE.MeshStandardMaterial({map:t,roughness:.18,metalness:.05}));
+  f.rotation.x=-Math.PI/2; f.position.z=Z0; f.receiveShadow=true; scene.add(f);
+  const out=new THREE.Mesh(new THREE.PlaneGeometry(120,120),M(0xc9ced4)); out.rotation.x=-Math.PI/2; out.position.y=-0.01; scene.add(out);
+})();
+// Muros de una sola cara (miran hacia adentro): al girar la cámara por fuera, se ven a través
+const wallMat=new THREE.MeshStandardMaterial({color:0xf4f5f7,roughness:.8,side:THREE.FrontSide});
+const wall=(w,x,z,ry)=>{const p=new THREE.Mesh(new THREE.PlaneGeometry(w,H),wallMat);p.position.set(x,H/2,z);p.rotation.y=ry;p.receiveShadow=true;scene.add(p);};
+wall(W,0,Z0+D/2,Math.PI); wall(D,-W/2,Z0,Math.PI/2); wall(D,W/2,Z0,-Math.PI/2);
+box(1.8,2.4,0.05,M(0xe2e4e8),11,1.2,Z0+D/2-0.12);
+
+// ---------- Techo ----------
+const roofY=H;
+const ceil=new THREE.Mesh(new THREE.PlaneGeometry(W,D),mat.white); ceil.rotation.x=Math.PI/2; ceil.position.set(0,roofY+0.6,Z0); scene.add(ceil);
+const sky=new THREE.Mesh(new THREE.PlaneGeometry(W,4),mat.sky); sky.rotation.x=Math.PI/2; sky.position.set(0,roofY+0.58,2); scene.add(sky);
+for(let z=Z0-D/2+1.5; z<Z0+D/2; z+=3){
+  box(W,0.18,0.18,mat.truss,0,roofY-0.4,z,scene,true);
+  box(W,0.12,0.12,mat.truss,0,roofY+0.4,z,scene,true);
+  for(let x=-W/2+1; x<W/2; x+=2){ const d=box(0.08,1.1,0.08,mat.truss,x,roofY,z,scene,true); d.rotation.z=(Math.floor(x)%4===0?1:-1)*0.75; }
+}
+for(let x=-W/2+2; x<W/2; x+=4) box(0.12,0.12,D,mat.truss,x,roofY+0.4,Z0,scene,false);
+for(let z=-16; z<=8; z+=3.5){
+  box(W-4,0.06,0.1,mat.lightBar,0,5.6,z,scene,false);
+  const s=new THREE.Mesh(new THREE.PlaneGeometry(W-4.1,0.06),mat.lightOn); s.rotation.x=Math.PI/2; s.position.set(0,5.565,z); scene.add(s);
+}
+
+// ---------- Góndolas ----------
+const shelves=[];
+function gondola(x,z,len,rotY,double=true,h=2.1){
+  const g=new THREE.Group(); g.position.set(x,0,z); g.rotation.y=rotY; scene.add(g);
+  const dep=double?0.9:0.45;
+  box(len,0.12,dep,mat.dark,0,0.06,0,g);
+  box(len,h,0.04,mat.shelf,0,h/2,double?0:-dep/2+0.02,g);
+  for(let u=-len/2; u<=len/2+0.01; u+=1) box(0.05,h,dep*0.95,mat.shelf,u,h/2,0,g);
+  const sides=double?[1,-1]:[1];
+  [0.15,0.55,0.95,1.35,1.75].forEach(y=>sides.forEach(s=>{
+    const sd=double?dep/2:dep-0.04, cz=double?s*sd/2:0.02;
+    const sh=box(len,0.03,sd-0.02,mat.shelf,0,y,cz,g); sh.userData={len,depth:sd-0.02}; shelves.push(sh);
+  }));
+}
+gondola(-W/2+0.35,3,12,Math.PI/2,false,2.3);
+gondola(-3,Z0+D/2-0.35,18,Math.PI,false,2.3);
+gondola(10,Z0+D/2-0.35,4,Math.PI,false,2.3);
+[-9.5,-6.5,-3.5,-0.5,2.5].forEach(x=>gondola(x,4.6,7,Math.PI/2,true));
+gondola(W/2-0.35,3,8,-Math.PI/2,false,2.3);
+
+for(let i=0;i<2;i++){
+  const g=new THREE.Group(); g.position.set(-11.5,0,-0.6+i*2.2); scene.add(g);
+  box(2.4,0.8,1.2,mat.dark,0,0.4,0,g);
+  const t=box(2.4,0.05,1.2,mat.shelf,0,0.85,0,g); t.rotation.x=-0.15;
+}
+
+// ---------- Congelados ----------
+function freezer(x,z,len){
+  const g=new THREE.Group(); g.position.set(x,0,z); scene.add(g);
+  box(len,0.75,1.9,mat.white,0,0.375,0,g);
+  box(len+0.01,0.14,1.91,mat.yellow,0,0.62,0,g,false);
+  box(len,0.06,1.9,mat.steel,0,0.78,0,g);
+  box(len-0.1,0.02,1.8,mat.glass,0,0.88,0,g,false);
+  for(let i=-1;i<=1;i+=2) box(len,0.1,0.04,mat.steel,0,0.85,i*0.93,g);
+}
+freezer(8.5,0.2,3.6); freezer(8.5,2.4,3.6); freezer(12.5,0.2,2.4);
+
+// ---------- Cajas ----------
+// La cajera se ubica al lado izquierdo (−x) del módulo; el cliente pasa por el lado derecho (+x).
+function checkout(x,z){
+  const g=new THREE.Group(); g.position.set(x,0,z); scene.add(g);
+  box(0.9,0.85,1.2,mat.blue,0,0.425,-0.9,g);
+  box(0.9,0.85,1.8,mat.blue,0,0.425,0.6,g);
+  box(0.98,0.06,1.25,mat.steel,0,0.88,-0.9,g);
+  box(0.98,0.06,1.85,mat.dark,0,0.88,0.6,g);
+  box(0.06,0.6,1.8,mat.dark,-0.45,1.2,0.6,g);
+  const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.45,12),mat.white); pole.position.set(-0.2,1.13,-1.05); g.add(pole);
+  const scr=box(0.03,0.28,0.38,mat.screen,-0.22,1.45,-1.05,g); scr.rotation.z=0.25;
+  box(0.9,1.3,0.35,mat.dark,0,0.65,1.7,g);
+  for(let y=0.35;y<1.3;y+=0.3) box(0.86,0.02,0.33,mat.shelf,0,y,1.72,g);
+}
+[-12,-9.8,-7.6,-5.4].forEach(x=>checkout(x,-5.5));
+
+for(let i=0;i<2;i++){
+  const g=new THREE.Group(); g.position.set(-W/2+1.1,0,-12+i*1.2); scene.add(g);
+  box(1.0,0.9,0.6,new THREE.MeshStandardMaterial({color:0x8e939b,metalness:.6,roughness:.3,wireframe:true}),0,0.55,0,g);
+  box(1.0,0.05,0.6,mat.yellow,0,0.95,0,g);
+}
+const ext=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,0.55,16),mat.red); ext.position.set(-W/2+0.2,1.2,-3); scene.add(ext);
+for(let i=0;i<3;i++) box(1.2,0.14,1.0,mat.pallet,W/2-1.2,0.07,5.5+i*1.15);
+
+// ---------- Señalética ----------
+function sign(text,icon,x,z,rotY,y=3.6){
+  const c=document.createElement('canvas'); c.width=1024; c.height=256; const g=c.getContext('2d');
+  g.fillStyle='#f5c518'; g.fillRect(0,0,1024,256);
+  g.fillStyle=icon; g.beginPath(); g.arc(128,128,70,0,Math.PI*2); g.fill();
+  g.fillStyle='#15171c'; g.font='800 84px Archivo, Arial, sans-serif'; g.textBaseline='middle';
+  const words=text.split(' '); if(text.length>12&&words.length>1){g.fillText(words.slice(0,-1).join(' '),232,92);g.fillText(words[words.length-1],232,172);} else g.fillText(text,232,128);
+  const t=new THREE.CanvasTexture(c); t.encoding=THREE.sRGBEncoding; t.anisotropy=8;
+  const m=new THREE.MeshStandardMaterial({map:t,roughness:.6});
+  const grp=new THREE.Group(); grp.position.set(x,y,z); grp.rotation.y=rotY; scene.add(grp);
+  box(2.4,0.6,0.05,M(0xf5c518),0,0,0,grp,false);
+  [0.03,-0.03].forEach((o,i)=>{const p=new THREE.Mesh(new THREE.PlaneGeometry(2.36,0.59),m);p.position.z=o;if(i)p.rotation.y=Math.PI;grp.add(p);});
+  [-0.9,0.9].forEach(dx=>box(0.01,roofY-0.4-y,0.01,mat.dark,dx,(roofY-0.4-y)/2+0.3,0,grp,false));
+}
+[['Frutas y Verduras','#3aa845',-11.2,0],['Abarrotes','#d23a2b',-9.5,0.6],['Lácteos','#2a7bd5',-6.5,0.6],
+ ['Snacks','#e8742a',-3.5,0.6],['Bebidas','#c8201e',-0.5,0.6],['Congelados','#2aa5d5',9.8,-1.4],['Limpieza','#7c49c9',W/2-1.2,3]
+].forEach(([t,c,x,z])=>sign(t,c,x,z,0));
+
+// ---------- Personas ----------
+function person(shirt,pants,{hair=0x1b1410,skin=0xb57a52,h=1.55,arm=0}={}){
+  const g=new THREE.Group(); const k=h/1.62;
+  const S=(geo,m,x,y,z)=>{const o=new THREE.Mesh(geo,m);o.position.set(x,y,z);o.castShadow=true;g.add(o);return o;};
+  const ms=M(shirt),mp=M(pants),mk=M(skin),mh=M(hair);
+  [-0.09,0.09].forEach(x=>{S(new THREE.CylinderGeometry(0.07,0.06,0.8,10),mp,x,0.4,0); S(new THREE.BoxGeometry(0.1,0.06,0.22),mat.black,x,0.03,0.04);});
+  const t=S(new THREE.CylinderGeometry(0.17,0.15,0.62,14),ms,0,1.11,0); t.scale.z=0.62;
+  S(new THREE.BoxGeometry(0.06,0.08,0.01),M(0xf5c518),0.08,1.25,0.1);           // fotocheck (marca el frente)
+  [-1,1].forEach(s=>{
+    const a=S(new THREE.CylinderGeometry(0.045,0.04,0.58,10),ms,s*0.21,1.1,0);
+    a.rotation.z=s*0.08; if(arm&&s===1){a.rotation.x=-arm; a.position.z=0.12; a.position.y=1.2;}
+  });
+  S(new THREE.CylinderGeometry(0.05,0.05,0.08,10),mk,0,1.45,0);
+  S(new THREE.SphereGeometry(0.11,20,16),mk,0,1.55,0.01);
+  const hr=S(new THREE.SphereGeometry(0.115,20,12,0,Math.PI*2,0,Math.PI*0.55),mh,0,1.565,-0.01); hr.rotation.x=-0.25;
+  g.scale.setScalar(k); scene.add(g); return g;
+}
+const faceTo=(g,dx,dz)=>{g.rotation.y=Math.atan2(dx,dz);};
+const cashierPos=new THREE.Vector3(-12.78,0,-6.35);
+const cashier=person(0x1f2fc4,0x22252c,{h:1.55}); cashier.position.copy(cashierPos); faceTo(cashier,1,0);
+const client=person(0x8a3b2f,0x3b4a66,{h:1.68,hair:0x2b2018}); client.position.set(-10.9,0,-4.2); faceTo(client,0,-1);
+const client2=person(0x3f7f5a,0x2d2d33,{h:1.6,hair:0x120d0a}); client2.position.set(-10.9,0,-2.9); faceTo(client2,0,-1);
+
+// ---------- Cigarrera ----------
+const CW=0.5, CH=0.85, CD=0.36;
+function posterTexture(){
+  const c=document.createElement('canvas'); c.width=360; c.height=612; const g=c.getContext('2d');
+  const gr=g.createLinearGradient(0,0,360,612); gr.addColorStop(0,'#2c2160'); gr.addColorStop(.55,'#7a3a9a'); gr.addColorStop(1,'#1d4f9a');
+  g.fillStyle=gr; g.fillRect(0,0,360,612);
+  g.strokeStyle='rgba(255,255,255,.08)'; g.lineWidth=2;
+  for(let y=0;y<520;y+=24) for(let x=((y/24)%2)*26;x<360;x+=52) g.strokeRect(x,y,52,24);
+  g.textAlign='center'; g.fillStyle='#a9dcff'; g.font='800 52px Archivo, Arial, sans-serif'; g.fillText('ARTE DE',180,82); g.fillText('CAMPAÑA',180,138);
+  g.font='500 15px "IBM Plex Mono", monospace'; g.fillStyle='rgba(255,255,255,.75)'; g.fillText('lightbox 0.50 × 0.85 m · referencial',180,172);
+  g.fillStyle='#f3f3f3'; g.fillRect(135,215,90,150); g.fillStyle='#2f3d96'; g.fillRect(135,215,90,62);
+  g.strokeStyle='#ffb347'; g.lineWidth=9; g.beginPath(); g.arc(180,300,105,Math.PI*1.1,Math.PI*1.9); g.stroke();
+  g.strokeStyle='#4fc3ff'; g.beginPath(); g.arc(180,300,120,Math.PI*0.05,Math.PI*0.85); g.stroke();
+  g.fillStyle='#ffffff'; g.fillRect(0,518,360,94);
+  g.fillStyle='#111'; g.font='800 30px Archivo, Arial, sans-serif'; g.fillText('FUMAR CAUSA',180,556); g.fillText('CÁNCER DE PULMÓN',180,592);
+  const t=new THREE.CanvasTexture(c); t.encoding=THREE.sRGBEncoding; t.anisotropy=8; return t;
+}
+const posterTex=posterTexture();
+const packColors=[0x1d6fd1,0x3a3f48,0x2e8b57,0xf2f2f2,0xd42a24,0xb9bec6,0x1f3d8f,0x2aa59a];
+
+function buildCigarrera(){
+  const root=new THREE.Group(); scene.add(root);
+  const posts=[], plates=[];
+  [-CW/2-0.035,CW/2+0.035].forEach(x=>{
+    const p=box(0.05,1,0.05,mat.black,x,0.5,0,root); posts.push(p);
+    plates.push(box(0.2,0.012,0.2,mat.black,x,0.006,0,root));
+  });
+  const unit=new THREE.Group(); root.add(unit);
+  // carcasa
+  box(CW+0.02,0.03,CD,mat.black,0,CH,0,unit);           // techo
+  box(CW+0.02,0.04,CD,mat.black,0,0.02,0,unit);          // base
+  [-1,1].forEach(s=>box(0.02,CH,CD,mat.black,s*(CW/2),CH/2,0,unit));
+  box(CW,CH,0.03,mat.black,0,CH/2,CD/2-0.06,unit);       // fondo del rack / dorso del lightbox
+  // lightbox (frente +z)
+  box(CW+0.04,CH+0.04,0.05,mat.black,0,CH/2,CD/2-0.02,unit);
+  const poster=new THREE.Mesh(new THREE.PlaneGeometry(CW-0.05,CH-0.05),
+    new THREE.MeshStandardMaterial({map:posterTex,emissive:0xffffff,emissiveMap:posterTex,emissiveIntensity:.85,roughness:.3}));
+  poster.position.set(0,CH/2,CD/2+0.006); unit.add(poster);
+  // rack (dorso −z): bandeja inferior + columnas con dispensador
+  box(CW,0.02,0.24,mat.black,0,0.17,-0.04,unit);
+  box(CW,0.06,0.02,mat.black,0,0.2,-CD/2+0.01,unit);
+  const packs=[]; const m4=new THREE.Matrix4(), q=new THREE.Quaternion();
+  for(let c=0;c<7;c++){
+    const x=-0.189+c*0.063;
+    const col=packColors[(c*3)%packColors.length];
+    const n=10+((c*7)%13);
+    for(let l=0;l<n;l++) packs.push({p:[x,0.195+l*0.024,-0.03],s:[0.056,0.022,0.088],c:col});
+    if(c<6) box(0.003,CH-0.25,0.2,mat.black,x+0.0315,0.2+(CH-0.25)/2,-0.04,unit,false);
+  }
+  for(let c=0;c<5;c++) packs.push({p:[-0.18+c*0.09,0.075,-0.06],s:[0.085,0.055,0.022],c:packColors[(c+3)%packColors.length]});
+  const im=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshStandardMaterial({roughness:.35,metalness:.05}),packs.length);
+  const col=new THREE.Color();
+  packs.forEach((k,i)=>{m4.compose(new THREE.Vector3(...k.p),q,new THREE.Vector3(...k.s)); im.setMatrixAt(i,m4); im.setColorAt(i,col.setHex(k.c));});
+  im.castShadow=true; unit.add(im);
+  // luz del lightbox
+  const glow=new THREE.PointLight(0xb7a2ff,0.5,2.2); glow.position.set(0,CH/2,CD/2+0.3); unit.add(glow);
+  return {root,unit,posts,setBase(b){
+    unit.position.y=b; const top=b+CH+0.03;
+    posts.forEach(p=>{p.scale.y=top; p.position.y=top/2;});
+  }};
+}
+// ---------- Cigarrera Transformer: vitrina acrílica de 2 niveles, dorso liso, un parante al piso ----------
+const TW=0.56, TH=0.46, TD=0.16;
+function buildTransformer(){
+  const root=new THREE.Group();
+  const acr=new THREE.MeshPhysicalMaterial({color:0xeaf4f8,roughness:.05,metalness:0,transparent:true,opacity:.22});
+  const trim=M(0x141518,{roughness:.4,metalness:.15});
+  const postZ=-TD/2-0.03;
+  const post=box(0.05,1,0.05,mat.black,0,0.5,postZ,root);
+  box(0.22,0.012,0.22,mat.black,0,0.006,postZ,root);
+  const unit=new THREE.Group(); root.add(unit);
+  box(0.08,0.06,0.03,mat.black,0,TH*0.75,-TD/2-0.015,unit);              // soporte superior
+  box(0.08,0.06,0.03,mat.black,0,TH*0.25,-TD/2-0.015,unit);              // soporte inferior
+  box(TW,TH,0.012,trim,0,TH/2,-TD/2+0.006,unit);                         // dorso liso
+  box(TW+0.02,0.022,TD+0.01,trim,0,TH-0.011,0,unit);                     // tapa
+  box(TW+0.02,0.022,TD+0.01,trim,0,0.011,0,unit);                        // base
+  box(TW,0.022,TD,trim,0,TH/2,0,unit);                                   // repisa central
+  [-1,1].forEach(s=>box(0.006,TH,TD,acr,s*TW/2,TH/2,0,unit,false));      // laterales acrílicos
+  box(TW,TH-0.04,0.005,acr,0,TH/2,TD/2,unit,false);                      // frente acrílico
+  [0.05,TH/2+0.045].forEach(y=>box(TW,0.035,0.006,acr,0,y,TD/2-0.02,unit,false)); // pestañas de nivel
+  const rows=[[0xb46fd0,0x9a4fc0,0x3e9a52,0x3e9a52,0xf2f2f2,0xf2f2f2],[0x1d4fa8,0x2e8b57,0x1d6fd1,0x1d6fd1,0xc8201e,0xc8201e]];
+  const items=[]; const q=new THREE.Quaternion();
+  rows.forEach((r,ri)=>{
+    const y0=ri===0?TH/2+0.011:0.022;
+    r.forEach((c,i)=>{
+      const x=-0.225+i*0.09;
+      for(let k=0;k<4;k++) items.push({p:[x,y0+0.045,TD/2-0.03-k*0.026],s:[0.056,0.088,0.022],c});
+      items.push({p:[x,y0+0.016,TD/2-0.0185],s:[0.056,0.03,0.002],c:0xffffff}); // franja de advertencia
+    });
+  });
+  const im=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshStandardMaterial({roughness:.35}),items.length);
+  const m4=new THREE.Matrix4(), col=new THREE.Color();
+  items.forEach((k,i)=>{m4.compose(new THREE.Vector3(...k.p),q,new THREE.Vector3(...k.s)); im.setMatrixAt(i,m4); im.setColorAt(i,col.setHex(k.c));});
+  im.castShadow=true; unit.add(im);
+  return {root,setBase(b){unit.position.y=b; const top=b+TH; post.scale.y=top; post.position.y=top/2;}};
+}
+const holder=new THREE.Group(); scene.add(holder);
+const simpleCig=buildCigarrera(); scene.remove(simpleCig.root); holder.add(simpleCig.root);
+const transfCig=buildTransformer(); holder.add(transfCig.root); transfCig.root.visible=false;
+let model='simple';
+const MODELS={
+  simple:{name:'Simple',h:()=>CH,accessZ:()=>-CD/2,note:'cigarrera simple 0.50 × 0.85 m (lightbox al frente, rack dispensador atrás)'},
+  transformer:{name:'Transformer',h:()=>TH,accessZ:()=>TD/2,note:'Transformer 0.56 × 0.46 × 0.16 m estimado desde foto (vitrina al frente, dorso liso)'}
+};
+const cig={root:holder,setBase(b){simpleCig.setBase(b); transfCig.setBase(b);}};
+function setModel(m){
+  model=m; simpleCig.root.visible=m==='simple'; transfCig.root.visible=m==='transformer';
+  document.querySelectorAll('[data-model]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.model===m));
+  updateInfo(); go(activeView);
+}
+document.querySelectorAll('[data-model]').forEach(b=>b.addEventListener('click',()=>setModel(b.dataset.model)));
+
+// Marcadores en piso para ambas ubicaciones
+function marker(num,x,z){
+  const g=new THREE.Group(); g.position.set(x,0.005,z); scene.add(g);
+  const ring=new THREE.Mesh(new THREE.RingGeometry(0.62,0.7,48),new THREE.MeshBasicMaterial({color:0xf5c518,transparent:true,opacity:.9}));
+  ring.rotation.x=-Math.PI/2; g.add(ring);
+  const c=document.createElement('canvas'); c.width=256; c.height=96; const x2=c.getContext('2d');
+  x2.fillStyle='#f5c518'; x2.fillRect(0,0,256,96); x2.fillStyle='#15171c'; x2.font='800 46px Archivo, Arial'; x2.textAlign='center'; x2.textBaseline='middle'; x2.fillText('OPCIÓN '+num,128,50);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false}));
+  sp.scale.set(0.8,0.3,1); sp.position.y=0.45; g.add(sp);
+  return {g,ring,sp};
+}
+
+// ---------- Opciones ----------
+const OPTIONS={
+  1:{title:'Fin de banda, frente a la fila', pos:[-12.15,-3.25], rot:0, faces:'Fila y pasillos',
+     pros:['Visible desde la fila de espera y desde los pasillos centrales.','No invade el puesto de la cajera ni la salida.'],
+     cons:['La cajera queda lejos: tiene que salir de su puesto para despachar.','Rack expuesto al lado del cliente: más riesgo de hurto y desorden.']},
+  2:{title:'Junto a la cajera, lado entrada', pos:[-13.0,-7.25], rot:Math.PI, faces:'Ingreso a tienda',
+     pros:['Despacho inmediato: el rack queda a espaldas de la cajera.','Stock bajo control visual permanente del personal.'],
+     cons:['Menos visible desde la fila y los pasillos interiores.','El lightbox mira al ingreso: se ve al entrar, no al esperar.']}
+};
+const markers={};
+let current=0, baseH=1.25;
+
+const $=id=>document.getElementById(id);
+function rackCenter(){ const md=MODELS[model]; const v=new THREE.Vector3(0,baseH+md.h()/2,md.accessZ()); return cig.root.localToWorld(v); }
+function frontDir(){ return new THREE.Vector3(Math.sin(cig.root.rotation.y),0,Math.cos(cig.root.rotation.y)); }
+function customInfo(d){
+  const f=frontDir();
+  const deg=((Math.round(cig.root.rotation.y*180/Math.PI)%360)+360)%360;
+  const toCash=cashierPos.clone().sub(cig.root.position).setY(0).normalize();
+  const accessDir=model==='simple'?f.clone().negate():f.clone();
+  const rackDot=accessDir.dot(toCash);
+  const what=model==='simple'?'El lightbox':'La vitrina';
+  const faces=f.z>0.5?'Fila y pasillos':f.z<-0.5?'Ingreso a tienda':f.x<0?'Muro izquierdo':'Zona de cajas';
+  const pros=[],cons=[];
+  (d<=1.0?pros:cons).push(d<=1.0?'La cajera alcanza el rack sin dejar su puesto.':`La cajera debe desplazarse ~${d.toFixed(1)} m para despachar.`);
+  if(model==='simple') (rackDot>0.5?pros:cons).push(rackDot>0.5?'El rack mira hacia la cajera.':'El rack no mira hacia la cajera: queda del lado del cliente o de lado.');
+  else (rackDot>0.5?cons:pros).push(rackDot>0.5?'La vitrina mira a la cajera: el cliente ve el dorso liso.':'La cajera accede por el frente: debe rodearla o abrirla desde un costado.');
+  if(f.z>0.5) pros.push(what+' se ve desde la fila y los pasillos.');
+  else if(f.z<-0.5) pros.push(what+' se ve al ingresar a la tienda.');
+  else cons.push(what+' queda de canto para el cliente: poca visibilidad.');
+  return {title:`Posición libre · giro ${deg}°`,faces,pros,cons};
+}
+function updateInfo(){
+  cig.root.updateMatrixWorld(true);
+  const dd=rackCenter().distanceTo(cashierPos.clone().setY(1.3));
+  const o=current?OPTIONS[current]:customInfo(dd);
+  $('eb').textContent='Cigarrera BAT · '+MODELS[model].name; $('note').textContent='Lectura preliminar. Supuestos: cajera de 1.55 m, '+MODELS[model].note+', alcance cómodo hasta ~1.85 m.'; $('optTitle').textContent=o.title;
+  cig.root.updateMatrixWorld(true);
+  const shoulder=cashierPos.clone().setY(1.3);
+  const d=rackCenter().distanceTo(shoulder);
+  $('vDist').textContent=d.toFixed(1)+' m';
+  $('sDist').className='stat '+(d<=1.0?'ok':'warn');
+  const top=baseH+MODELS[model].h()-0.02;
+  $('vTop').textContent=top.toFixed(2)+' m';
+  $('sTop').className='stat '+(top<=1.85?'ok':'warn');
+  $('vVis').textContent=o.faces;
+  $('pc').innerHTML=o.pros.map(t=>`<li class="p">${t}</li>`).join('')+o.cons.map(t=>`<li class="c">${t}</li>`).join('');
+}
+function setOption(n){
+  current=n; const o=OPTIONS[n];
+  cig.root.position.set(o.pos[0],0,o.pos[1]); cig.root.rotation.y=o.rot; cig.setBase(baseH);
+  Object.entries(markers).forEach(([k,m])=>{const on=+k===n; m.ring.material.opacity=on?0:.9; m.sp.visible=!on;});
+  // la cajera gira hacia el rack si está a mano (opción 2); si no, mira su POS
+  faceTo(cashier,1,0);
+  document.querySelectorAll('[data-opt]').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.opt===n));
+  updateInfo(); go(activeView);
+}
+$('hBase').addEventListener('input',e=>{baseH=+e.target.value; $('hOut').textContent=baseH.toFixed(2)+' m'; cig.setBase(baseH); updateInfo();});
+document.querySelectorAll('[data-opt]').forEach(b=>b.addEventListener('click',()=>setOption(+b.dataset.opt)));
+// ---------- Mover y girar ----------
+let moveMode=false, dragging=false;
+const ray=new THREE.Raycaster(), ndc=new THREE.Vector2(), floorPlane=new THREE.Plane(new THREE.Vector3(0,1,0),0), hitP=new THREE.Vector3(), dragOff=new THREE.Vector3();
+function toCustom(){
+  if(current===0) return; current=0;
+  Object.values(markers).forEach(m=>{m.ring.material.opacity=.9; m.sp.visible=true;});
+  document.querySelectorAll('[data-opt]').forEach(b=>b.setAttribute('aria-pressed',false));
+}
+function setRay(e){const r=renderer.domElement.getBoundingClientRect(); ndc.set(((e.clientX-r.left)/r.width)*2-1,-((e.clientY-r.top)/r.height)*2+1); ray.setFromCamera(ndc,camera);}
+stage.addEventListener('pointerdown',e=>{
+  if(!moveMode) return; setRay(e);
+  if(!ray.intersectObject(cig.root,true).length) return;
+  if(ray.ray.intersectPlane(floorPlane,hitP)) dragOff.copy(cig.root.position).sub(hitP);
+  dragging=true; controls.enabled=false; tween=null;
+  try{stage.setPointerCapture(e.pointerId);}catch(_){}
+},true);
+stage.addEventListener('pointermove',e=>{
+  if(!dragging) return; setRay(e);
+  if(!ray.ray.intersectPlane(floorPlane,hitP)) return;
+  const p=hitP.add(dragOff);
+  cig.root.position.set(Math.max(-W/2+0.5,Math.min(W/2-0.5,p.x)),0,Math.max(Z0-D/2+0.4,Math.min(Z0+D/2-0.4,p.z)));
+  toCustom(); updateInfo();
+});
+const endDrag=()=>{dragging=false; controls.enabled=true;};
+stage.addEventListener('pointerup',endDrag); stage.addEventListener('pointercancel',endDrag);
+$('mv').addEventListener('click',e=>{moveMode=!moveMode; e.currentTarget.setAttribute('aria-pressed',moveMode); $('mvHint').hidden=!moveMode; renderer.domElement.style.cursor=moveMode?'grab':'';});
+const turn=a=>{cig.root.rotation.y+=a; toCustom(); updateInfo();};
+$('rl').addEventListener('click',()=>turn(Math.PI/4));
+$('rr').addEventListener('click',()=>turn(-Math.PI/4));
+
+$('collapse').addEventListener('click',e=>{const c=$('card'); const min=c.classList.toggle('min'); e.currentTarget.textContent=min?'Ver':'Ocultar'; e.currentTarget.setAttribute('aria-expanded',!min);});
+
+// ---------- Productos ----------
+const palette=[0xd23a2b,0xf2b705,0x2a7bd5,0x2f9e3a,0xe8742a,0xffffff,0x7c49c9,0x1d1d1d,0xe85d9a,0x55c2c9];
+let prodMesh=null;
+function buildProducts(){
+  scene.updateMatrixWorld(true);
+  const items=[]; const q=new THREE.Quaternion(), p=new THREE.Vector3();
+  shelves.forEach(sh=>{
+    const {len,depth}=sh.userData; let x=-len/2+0.08, col=0, run=0; const hgt=0.18+Math.random()*0.14;
+    while(x<len/2-0.08){
+      if(run--<=0){col=palette[Math.random()*palette.length|0]; run=3+Math.random()*6|0;}
+      p.set(x,0.015+hgt/2,0); sh.localToWorld(p); sh.getWorldQuaternion(q);
+      items.push({m:new THREE.Matrix4().compose(p.clone(),q.clone(),new THREE.Vector3(0.11,hgt,depth*0.85)),c:col}); x+=0.125;
+    }
+  });
+  prodMesh=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshStandardMaterial({roughness:.5}),items.length);
+  const color=new THREE.Color(); items.forEach((it,i)=>{prodMesh.setMatrixAt(i,it.m); prodMesh.setColorAt(i,color.setHex(it.c));});
+  prodMesh.castShadow=true; scene.add(prodMesh);
+}
+$('t-prod').addEventListener('click',e=>{ if(!prodMesh) buildProducts(); else prodMesh.visible=!prodMesh.visible; e.currentTarget.setAttribute('aria-pressed',prodMesh.visible); });
+
+// ---------- Luz ----------
+scene.add(new THREE.HemisphereLight(0xffffff,0xd9cbb5,0.75));
+const sun=new THREE.DirectionalLight(0xfff6e8,1.1); sun.position.set(-8,30,-6); sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048); Object.assign(sun.shadow.camera,{left:-22,right:22,top:20,bottom:-20,near:1,far:70}); sun.shadow.bias=-0.0005;
+scene.add(sun); scene.add(new THREE.AmbientLight(0xffffff,0.25));
+
+// ---------- Vistas ----------
+let activeView='general', tween=null;
+function viewFor(name){
+  cig.root.updateMatrixWorld(true);
+  const hh=MODELS[model].h(); const c=new THREE.Vector3(cig.root.position.x,baseH+hh/2,cig.root.position.z);
+  const f=frontDir(), side=new THREE.Vector3(f.z,0,-f.x);
+  switch(name){
+    case 'cliente': return {p:c.clone().addScaledVector(f,3.6).setY(1.6), t:c};
+    case 'rack':    return {p:c.clone().addScaledVector(f,-1.6).setY(1.75), t:c.clone().setY(baseH+hh*0.45)};
+    case 'lateral': return {p:c.clone().addScaledVector(side,3).addScaledVector(f,0.6).setY(1.8), t:c.clone().setY(1.1)};
+    case 'cajero':  { const eye=cashierPos.clone().setY(1.45); const dir=c.clone().sub(eye).setY(0).normalize();
+                      return {p:eye.clone().addScaledVector(dir,-0.05), t:c}; }
+    case 'planta':  return {p:new THREE.Vector3(-10.5,9,-12.5), t:new THREE.Vector3(-10.5,0,-4.8)};
+    default:        return {p:new THREE.Vector3(-15.3,2.9,-11.2), t:new THREE.Vector3(-10.5,1.2,-4.4)};
+  }
+}
+function go(name,instant=false){
+  activeView=name; const to=viewFor(name);
+  cashier.visible = name!=='cajero';
+  if(instant){camera.position.copy(to.p);controls.target.copy(to.t);tween=null;}
+  else tween={fp:camera.position.clone(),ft:controls.target.clone(),to,k:0};
+  document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===name));
+}
+document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.view)));
+controls.addEventListener('start',()=>{tween=null; if(activeView==='cajero'){cashier.visible=true;}});
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.fov=w<600?70:55;camera.updateProjectionMatrix();}
+addEventListener('resize',resize); resize();
+cig.root.position.set(-13.0,0,-7.25); cig.root.rotation.y=Math.PI; cig.setBase(baseH); updateInfo(); go('general',true);
+
+renderer.setAnimationLoop(()=>{
+  if(tween){
+    tween.k=Math.min(1,tween.k+(reduce?1:0.03)); const e=1-Math.pow(1-tween.k,3);
+    camera.position.lerpVectors(tween.fp,tween.to.p,e); controls.target.lerpVectors(tween.ft,tween.to.t,e);
+    if(tween.k>=1) tween=null;
+  }
+  controls.update(); renderer.render(scene,camera);
+});
+</script>
+</body>
+</html>
