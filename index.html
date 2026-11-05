@@ -87,7 +87,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   <div class="row" role="toolbar" aria-label="Ubicación de la cigarrera">
     <span class="lbl">Ubicación</span>
     <span class="lbl">Modelo</span>
-    <button class="opt" id="m-simple" data-model="simple" aria-pressed="true">Pixel 3.4</button>
+    <button class="opt" id="m-simple" data-model="simple" aria-pressed="true">P4</button>
     <button class="opt" id="m-transf" data-model="transformer" aria-pressed="false">Transformer</button>
     <button id="mv" aria-pressed="false">Mover</button>
     <button id="rl" aria-label="Girar 45 grados a la izquierda">↺ 45°</button>
@@ -269,66 +269,66 @@ const cashier=person(0x1f2fc4,0x22252c,{h:1.55}); cashier.position.copy(cashierP
 const client=person(0x8a3b2f,0x3b4a66,{h:1.68,hair:0x2b2018}); client.position.set(-10.9,0,-4.2); faceTo(client,0,-1);
 const client2=person(0x3f7f5a,0x2d2d33,{h:1.6,hair:0x120d0a}); client2.position.set(-10.9,0,-2.9); faceTo(client2,0,-1);
 
-// ---------- Cigarrera ----------
-const CW=0.5, CH=0.85, CD=0.36;
+// ---------- Cigarrera P4: caja negra con lightbox frontal, cajón inferior con candado, dorso calado y parante tubular ----------
+const CW=0.40, CH=0.56, CD=0.24, LB=0.42;   // ancho, alto total, fondo, alto del lightbox
 function posterTexture(){
-  const c=document.createElement('canvas'); c.width=360; c.height=612; const g=c.getContext('2d');
-  const gr=g.createLinearGradient(0,0,360,612); gr.addColorStop(0,'#2c2160'); gr.addColorStop(.55,'#7a3a9a'); gr.addColorStop(1,'#1d4f9a');
-  g.fillStyle=gr; g.fillRect(0,0,360,612);
-  g.strokeStyle='rgba(255,255,255,.08)'; g.lineWidth=2;
-  for(let y=0;y<520;y+=24) for(let x=((y/24)%2)*26;x<360;x+=52) g.strokeRect(x,y,52,24);
-  g.textAlign='center'; g.fillStyle='#a9dcff'; g.font='800 52px Archivo, Arial, sans-serif'; g.fillText('ARTE DE',180,82); g.fillText('CAMPAÑA',180,138);
-  g.font='500 15px "IBM Plex Mono", monospace'; g.fillStyle='rgba(255,255,255,.75)'; g.fillText('lightbox 0.50 × 0.85 m · referencial',180,172);
-  g.fillStyle='#f3f3f3'; g.fillRect(135,215,90,150); g.fillStyle='#2f3d96'; g.fillRect(135,215,90,62);
-  g.strokeStyle='#ffb347'; g.lineWidth=9; g.beginPath(); g.arc(180,300,105,Math.PI*1.1,Math.PI*1.9); g.stroke();
-  g.strokeStyle='#4fc3ff'; g.beginPath(); g.arc(180,300,120,Math.PI*0.05,Math.PI*0.85); g.stroke();
-  g.fillStyle='#ffffff'; g.fillRect(0,518,360,94);
-  g.fillStyle='#111'; g.font='800 30px Archivo, Arial, sans-serif'; g.fillText('FUMAR CAUSA',180,556); g.fillText('CÁNCER DE PULMÓN',180,592);
+  const c=document.createElement('canvas'); c.width=400; c.height=420; const g=c.getContext('2d');
+  const gr=g.createRadialGradient(200,190,10,200,190,300); gr.addColorStop(0,'#eaf6ff'); gr.addColorStop(.18,'#7cc4ff'); gr.addColorStop(.55,'#1f5fd6'); gr.addColorStop(1,'#0b2a7a');
+  g.fillStyle=gr; g.fillRect(0,0,400,420);
+  g.strokeStyle='rgba(255,255,255,.35)'; g.lineWidth=1.5;
+  for(let i=0;i<70;i++){const a=Math.random()*Math.PI*2, r1=30+Math.random()*40, r2=120+Math.random()*180; g.beginPath(); g.moveTo(200+Math.cos(a)*r1,190+Math.sin(a)*r1); g.lineTo(200+Math.cos(a)*r2,190+Math.sin(a)*r2); g.stroke();}
+  g.fillStyle='#1b2f7a'; g.fillRect(168,120,64,104); g.fillStyle='#e8eefc'; g.fillRect(176,132,48,22);
+  g.fillStyle='#f5c518'; g.fillRect(168,196,64,28);
+  g.textAlign='center'; g.fillStyle='#ffffff'; g.font='800 46px Archivo, Arial, sans-serif'; g.fillText('ARTE DE',200,300); g.fillText('CAMPAÑA',200,348);
+  g.font='500 13px "IBM Plex Mono", monospace'; g.fillStyle='rgba(255,255,255,.8)'; g.fillText('lightbox P4 · arte referencial',200,388);
   const t=new THREE.CanvasTexture(c); t.encoding=THREE.sRGBEncoding; t.anisotropy=8; return t;
 }
 const posterTex=posterTexture();
-const packColors=[0x1d6fd1,0x3a3f48,0x2e8b57,0xf2f2f2,0xd42a24,0xb9bec6,0x1f3d8f,0x2aa59a];
 
 function buildCigarrera(){
   const root=new THREE.Group(); scene.add(root);
-  const posts=[], plates=[];
-  [-CW/2-0.035,CW/2+0.035].forEach(x=>{
-    const p=box(0.05,1,0.05,mat.black,x,0.5,0,root); posts.push(p);
-    plates.push(box(0.2,0.012,0.2,mat.black,x,0.006,0,root));
-  });
+  const black=M(0x111214,{roughness:.55,metalness:.1});
+  const postZ=-CD/2-0.04;
+  const post=new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.035,1,24),M(0x0d0e10,{roughness:.3,metalness:.3}));
+  post.position.set(0.06,0.5,postZ); post.castShadow=true; root.add(post);
+  const plate=new THREE.Mesh(new THREE.CylinderGeometry(0.17,0.17,0.012,32),black); plate.position.set(0.06,0.006,postZ); plate.receiveShadow=true; root.add(plate);
   const unit=new THREE.Group(); root.add(unit);
-  // carcasa
-  box(CW+0.02,0.03,CD,mat.black,0,CH,0,unit);           // techo
-  box(CW+0.02,0.04,CD,mat.black,0,0.02,0,unit);          // base
-  [-1,1].forEach(s=>box(0.02,CH,CD,mat.black,s*(CW/2),CH/2,0,unit));
-  box(CW,CH,0.03,mat.black,0,CH/2,CD/2-0.06,unit);       // fondo del rack / dorso del lightbox
-  // lightbox (frente +z)
-  box(CW+0.04,CH+0.04,0.05,mat.black,0,CH/2,CD/2-0.02,unit);
-  const poster=new THREE.Mesh(new THREE.PlaneGeometry(CW-0.05,CH-0.05),
-    new THREE.MeshStandardMaterial({map:posterTex,emissive:0xffffff,emissiveMap:posterTex,emissiveIntensity:.85,roughness:.3}));
-  poster.position.set(0,CH/2,CD/2+0.006); unit.add(poster);
-  // rack (dorso −z): bandeja inferior + columnas con dispensador
-  box(CW,0.02,0.24,mat.black,0,0.17,-0.04,unit);
-  box(CW,0.06,0.02,mat.black,0,0.2,-CD/2+0.01,unit);
+  const dz=LB-CH; // el cajón cuelga bajo el lightbox
+  // cuerpo
+  box(CW,CH,0.008,black,0,CH/2,-CD/2+0.004,unit);                    // dorso
+  [-1,1].forEach(s=>box(0.008,CH,CD,black,s*CW/2,CH/2,0,unit));      // laterales
+  box(CW,0.008,CD,black,0,CH,0,unit);                                // techo
+  box(CW,0.008,CD,black,0,0.004,0,unit);                             // piso
+  // dorso calado: ventanas rectangulares
+  const hole=M(0x050506,{roughness:1});
+  [[-0.08,0.42],[0.03,0.42],[-0.12,0.30],[-0.02,0.30],[0.10,0.30],[-0.12,0.17],[-0.02,0.17],[0.10,0.17]].forEach(([x,y])=>box(0.07,0.09,0.004,hole,x,y,-CD/2-0.001,unit,false));
+  // abrazaderas al tubo
+  [0.44,0.20].forEach(y=>{const r=new THREE.Mesh(new THREE.TorusGeometry(0.04,0.006,8,24),black); r.rotation.x=Math.PI/2; r.position.set(0.06,y,postZ); unit.add(r);});
+  // lightbox frontal con marco
+  const fz=CD/2;
+  box(CW+0.01,0.025,0.03,black,0,CH-0.0125,fz,unit);
+  box(CW+0.01,0.025,0.03,black,0,CH-LB+0.0125,fz,unit);
+  [-1,1].forEach(s=>box(0.025,LB,0.03,black,s*(CW/2-0.0075),CH-LB/2,fz,unit));
+  const poster=new THREE.Mesh(new THREE.PlaneGeometry(CW-0.04,LB-0.04),
+    new THREE.MeshStandardMaterial({map:posterTex,emissive:0xffffff,emissiveMap:posterTex,emissiveIntensity:.9,roughness:.3}));
+  poster.position.set(0,CH-LB/2,fz+0.008); unit.add(poster);
+  // cajón dispensador inferior con candado
+  const drawerH=CH-LB;
+  box(CW-0.01,drawerH-0.01,0.02,M(0x0a0a0b,{roughness:.15,metalness:.2}),0,drawerH/2,fz+0.005,unit);
+  box(CW*0.6,0.012,0.02,black,0,drawerH-0.012,fz+0.02,unit);           // ranura de salida
+  const lock=box(0.03,0.035,0.012,M(0xc9a227,{metalness:.8,roughness:.25}),0,drawerH-0.045,fz+0.022,unit);
+  const shackle=new THREE.Mesh(new THREE.TorusGeometry(0.011,0.003,8,16,Math.PI),M(0xbfc3c8,{metalness:.9,roughness:.2}));
+  shackle.position.set(0,drawerH-0.026,fz+0.022); unit.add(shackle);
+  // stock interno visible por las ventanas traseras
   const packs=[]; const m4=new THREE.Matrix4(), q=new THREE.Quaternion();
-  for(let c=0;c<7;c++){
-    const x=-0.189+c*0.063;
-    const col=packColors[(c*3)%packColors.length];
-    const n=10+((c*7)%13);
-    for(let l=0;l<n;l++) packs.push({p:[x,0.195+l*0.024,-0.03],s:[0.056,0.022,0.088],c:col});
-    if(c<6) box(0.003,CH-0.25,0.2,mat.black,x+0.0315,0.2+(CH-0.25)/2,-0.04,unit,false);
-  }
-  for(let c=0;c<5;c++) packs.push({p:[-0.18+c*0.09,0.075,-0.06],s:[0.085,0.055,0.022],c:packColors[(c+3)%packColors.length]});
-  const im=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshStandardMaterial({roughness:.35,metalness:.05}),packs.length);
+  const pc=[0x1d4fa8,0x1d4fa8,0x3a3f48,0xf2f2f2,0x2e8b57];
+  for(let c=0;c<5;c++) for(let l=0;l<14;l++) packs.push({p:[-0.15+c*0.075,0.03+l*0.024,-0.02],s:[0.056,0.022,0.088],c:pc[c]});
+  const im=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshStandardMaterial({roughness:.35}),packs.length);
   const col=new THREE.Color();
   packs.forEach((k,i)=>{m4.compose(new THREE.Vector3(...k.p),q,new THREE.Vector3(...k.s)); im.setMatrixAt(i,m4); im.setColorAt(i,col.setHex(k.c));});
-  im.castShadow=true; unit.add(im);
-  // luz del lightbox
-  const glow=new THREE.PointLight(0xb7a2ff,0.5,2.2); glow.position.set(0,CH/2,CD/2+0.3); unit.add(glow);
-  return {root,unit,posts,setBase(b){
-    unit.position.y=b; const top=b+CH+0.03;
-    posts.forEach(p=>{p.scale.y=top; p.position.y=top/2;});
-  }};
+  unit.add(im);
+  const glow=new THREE.PointLight(0x8fc4ff,0.5,2.0); glow.position.set(0,CH-LB/2,fz+0.3); unit.add(glow);
+  return {root,unit,setBase(b){unit.position.y=b; const top=b+CH-0.02; post.scale.y=top; post.position.y=top/2;}};
 }
 // ---------- Cigarrera Transformer: vitrina acrílica de 2 niveles, dorso liso, un parante al piso ----------
 const TW=0.56, TH=0.46, TD=0.16;
@@ -370,7 +370,7 @@ const simpleCig=buildCigarrera(); scene.remove(simpleCig.root); holder.add(simpl
 const transfCig=buildTransformer(); holder.add(transfCig.root); transfCig.root.visible=false;
 let model='simple';
 const MODELS={
-  simple:{name:'Pixel 3.4',h:()=>CH,accessZ:()=>-CD/2,note:'Pixel 3.4 de 0.50 × 0.85 m (lightbox al frente, rack dispensador atrás)'},
+  simple:{name:'P4',h:()=>CH,accessZ:()=>CD/2,note:'P4 de 0.40 × 0.56 × 0.24 m estimado desde foto (lightbox arriba, cajón con candado abajo, parante tubular)'},
   transformer:{name:'Transformer',h:()=>TH,accessZ:()=>TD/2,note:'Transformer 0.56 × 0.46 × 0.16 m estimado desde foto (vitrina al frente, dorso liso)'}
 };
 const cig={root:holder,setBase(b){simpleCig.setBase(b); transfCig.setBase(b);}};
@@ -412,14 +412,14 @@ function customInfo(d){
   const f=frontDir();
   const deg=((Math.round(cig.root.rotation.y*180/Math.PI)%360)+360)%360;
   const toCash=cashierPos.clone().sub(cig.root.position).setY(0).normalize();
-  const accessDir=model==='simple'?f.clone().negate():f.clone();
+  const accessDir=f.clone();
   const rackDot=accessDir.dot(toCash);
   const what=model==='simple'?'El lightbox':'La vitrina';
+  const acc=model==='simple'?'El cajón con candado':'La vitrina';
   const faces=f.z>0.5?'Fila y pasillos':f.z<-0.5?'Ingreso a tienda':f.x<0?'Muro izquierdo':'Zona de cajas';
   const pros=[],cons=[];
   (d<=1.0?pros:cons).push(d<=1.0?'La cajera alcanza el rack sin dejar su puesto.':`La cajera debe desplazarse ~${d.toFixed(1)} m para despachar.`);
-  if(model==='simple') (rackDot>0.5?pros:cons).push(rackDot>0.5?'El rack mira hacia la cajera.':'El rack no mira hacia la cajera: queda del lado del cliente o de lado.');
-  else (rackDot>0.5?cons:pros).push(rackDot>0.5?'La vitrina mira a la cajera: el cliente ve el dorso liso.':'La cajera accede por el frente: debe rodearla o abrirla desde un costado.');
+  (rackDot>0.5?cons:pros).push(rackDot>0.5?acc+' mira a la cajera: el cliente ve el dorso.':'La cajera accede por el frente: debe rodearla para reponer o despachar.');
   if(f.z>0.5) pros.push(what+' se ve desde la fila y los pasillos.');
   else if(f.z<-0.5) pros.push(what+' se ve al ingresar a la tienda.');
   else cons.push(what+' queda de canto para el cliente: poca visibilidad.');
