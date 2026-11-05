@@ -87,7 +87,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   <div class="row" role="toolbar" aria-label="Ubicación de la cigarrera">
     <span class="lbl">Ubicación</span>
     <span class="lbl">Modelo</span>
-    <button class="opt" id="m-simple" data-model="simple" aria-pressed="true">Simple</button>
+    <button class="opt" id="m-simple" data-model="simple" aria-pressed="true">Pixel 3.4</button>
     <button class="opt" id="m-transf" data-model="transformer" aria-pressed="false">Transformer</button>
     <button id="mv" aria-pressed="false">Mover</button>
     <button id="rl" aria-label="Girar 45 grados a la izquierda">↺ 45°</button>
@@ -370,7 +370,7 @@ const simpleCig=buildCigarrera(); scene.remove(simpleCig.root); holder.add(simpl
 const transfCig=buildTransformer(); holder.add(transfCig.root); transfCig.root.visible=false;
 let model='simple';
 const MODELS={
-  simple:{name:'Simple',h:()=>CH,accessZ:()=>-CD/2,note:'cigarrera simple 0.50 × 0.85 m (lightbox al frente, rack dispensador atrás)'},
+  simple:{name:'Pixel 3.4',h:()=>CH,accessZ:()=>-CD/2,note:'Pixel 3.4 de 0.50 × 0.85 m (lightbox al frente, rack dispensador atrás)'},
   transformer:{name:'Transformer',h:()=>TH,accessZ:()=>TD/2,note:'Transformer 0.56 × 0.46 × 0.16 m estimado desde foto (vitrina al frente, dorso liso)'}
 };
 const cig={root:holder,setBase(b){simpleCig.setBase(b); transfCig.setBase(b);}};
