@@ -75,7 +75,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
     </div>
     <ul class="pc" id="pc"></ul>
     <label class="slider" for="hBase">Altura base
-      <input type="range" id="hBase" min="0.6" max="1.9" step="0.05" value="1.25">
+      <input type="range" id="hBase" min="1.0" max="1.9" step="0.05" value="1.25">
       <output id="hOut">1.25 m</output>
     </label>
     <div class="note" id="note"></div>
@@ -89,8 +89,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
     <span class="lbl">Modelo</span>
     <button class="opt" id="m-simple" data-model="simple" aria-pressed="true">P4</button>
     <button class="opt" id="m-transf" data-model="transformer" aria-pressed="false">Transformer</button>
-    <button class="opt" id="m-prosep" data-model="prosep" aria-pressed="false">Prosep + parante</button>
-    <button class="opt" id="m-prosepf" data-model="prosepFree" aria-pressed="false">Prosep colgante</button>
+    <button class="opt" id="m-prosep" data-model="prosep" aria-pressed="false">Prosep</button>
     <button id="mv" aria-pressed="false">Mover</button>
     <button id="rl" aria-label="Girar 45 grados a la izquierda">↺ 45°</button>
     <button id="rr" aria-label="Girar 45 grados a la derecha">↻ 45°</button>
@@ -368,7 +367,7 @@ function buildTransformer(){
   return {root,setBase(b){unit.position.y=b; const top=b+TH; post.scale.y=top; post.position.y=top/2;}};
 }
 // ---------- Cigarrera Prosep: lightbox vertical angosto, puerta lateral inferior con llave ----------
-const PW=0.12, PH=0.46, PD=0.09, PDOOR=0.12;
+const PW=0.168, PH=0.50, PD=0.256, PDOOR=0.13;   // ancho 16.8 · alto 50 · largo (fondo) 25.6 cm
 function prosepTexture(){
   const c=document.createElement('canvas'); c.width=160; c.height=600; const g=c.getContext('2d');
   g.fillStyle='#17151c'; g.fillRect(0,0,160,600);
@@ -423,14 +422,12 @@ const holder=new THREE.Group(); scene.add(holder);
 const simpleCig=buildCigarrera(); scene.remove(simpleCig.root); holder.add(simpleCig.root);
 const transfCig=buildTransformer(); holder.add(transfCig.root); transfCig.root.visible=false;
 const prosepPost=buildProsep(true); holder.add(prosepPost.root); prosepPost.root.visible=false;
-const prosepFree=buildProsep(false); holder.add(prosepFree.root); prosepFree.root.visible=false;
-const ALL={simple:simpleCig,transformer:transfCig,prosep:prosepPost,prosepFree};
+const ALL={simple:simpleCig,transformer:transfCig,prosep:prosepPost};
 let model='simple';
 const MODELS={
   simple:{name:'P4',h:()=>CH,access:()=>new THREE.Vector3(0,(CH-LB)/2,CD/2),side:false,note:'P4 de 0.40 × 0.56 × 0.24 m estimado desde foto (lightbox arriba, cajón con candado abajo, parante tubular)'},
   transformer:{name:'Transformer',h:()=>TH,access:()=>new THREE.Vector3(0,TH/2,TD/2),side:false,note:'Transformer 0.56 × 0.46 × 0.16 m estimado desde foto (vitrina al frente, dorso liso)'},
-  prosep:{name:'Prosep con parante',h:()=>PH,access:()=>new THREE.Vector3(PW/2,0.07,0),side:true,note:'Prosep 0.12 × 0.46 × 0.09 m estimado desde foto, sobre parante al piso; despacho solo por la puerta lateral inferior'},
-  prosepFree:{name:'Prosep sin parante',h:()=>PH,access:()=>new THREE.Vector3(PW/2,0.07,0),side:true,note:'Prosep 0.12 × 0.46 × 0.09 m estimado desde foto, colgado con ganchos (sin parante); despacho solo por la puerta lateral inferior'}
+  prosep:{name:'Prosep',h:()=>PH,access:()=>new THREE.Vector3(PW/2,0.07,0),side:true,note:'Prosep de 16.8 (ancho) × 50 (alto) × 25.6 cm (largo/fondo), sobre parante al piso; despacho solo por la puerta lateral inferior'}
 };
 const cig={root:holder,setBase(b){Object.values(ALL).forEach(c=>c.setBase(b));}};
 function setModel(m){
@@ -480,7 +477,6 @@ function customInfo(d){
   (d<=1.0?pros:cons).push(d<=1.0?'La cajera alcanza el rack sin dejar su puesto.':`La cajera debe desplazarse ~${d.toFixed(1)} m para despachar.`);
   if(md.side) (rackDot>0.5?pros:cons).push(rackDot>0.5?'La puerta lateral con llave queda hacia la cajera.':'La puerta lateral no queda hacia la cajera: gírala para que despache sin salir.');
   else (rackDot>0.5?cons:pros).push(rackDot>0.5?acc+' mira a la cajera: el cliente ve el dorso.':'La cajera accede por el frente: debe rodearla para reponer o despachar.');
-  if(model==='prosepFree') pros.push('Sin parante: no ocupa piso, se cuelga del panel negro de la caja.');
   if(f.z>0.5) pros.push(what+' se ve desde la fila y los pasillos.');
   else if(f.z<-0.5) pros.push(what+' se ve al ingresar a la tienda.');
   else cons.push(what+' queda de canto para el cliente: poca visibilidad.');
