@@ -78,6 +78,11 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
       <input type="range" id="hBase" min="1.0" max="1.9" step="0.05" value="1.25">
       <output id="hOut">1.25 m</output>
     </label>
+    <label class="slider" for="sc">Tamaño
+      <input type="range" id="sc" min="0.5" max="2" step="0.05" value="1">
+      <output id="scOut">100%</output>
+    </label>
+    <div class="note" id="dims"></div>
     <div class="note" id="note"></div>
   </div>
 </div>
@@ -425,11 +430,13 @@ const prosepPost=buildProsep(true); holder.add(prosepPost.root); prosepPost.root
 const ALL={simple:simpleCig,transformer:transfCig,prosep:prosepPost};
 let model='simple';
 const MODELS={
-  simple:{name:'P4',h:()=>CH,access:()=>new THREE.Vector3(0,(CH-LB)/2,CD/2),side:false,note:'P4 de 0.40 × 0.56 × 0.24 m estimado desde foto (lightbox arriba, cajón con candado abajo, parante tubular)'},
-  transformer:{name:'Transformer',h:()=>TH,access:()=>new THREE.Vector3(0,TH/2,TD/2),side:false,note:'Transformer 0.56 × 0.46 × 0.16 m estimado desde foto (vitrina al frente, dorso liso)'},
-  prosep:{name:'Prosep',h:()=>PH,access:()=>new THREE.Vector3(PW/2,0.07,0),side:true,note:'Prosep de 16.8 (ancho) × 50 (alto) × 25.6 cm (largo/fondo), sobre parante al piso; despacho solo por la puerta lateral inferior'}
+  simple:{name:'P4',h:()=>CH,access:()=>new THREE.Vector3(0,(CH-LB)/2,CD/2),dims:[40,56,24],side:false,note:'P4 de 0.40 × 0.56 × 0.24 m estimado desde foto (lightbox arriba, cajón con candado abajo, parante tubular)'},
+  transformer:{name:'Transformer',h:()=>TH,access:()=>new THREE.Vector3(0,TH/2,TD/2),dims:[56,46,16],side:false,note:'Transformer 0.56 × 0.46 × 0.16 m estimado desde foto (vitrina al frente, dorso liso)'},
+  prosep:{name:'Prosep',h:()=>PH,access:()=>new THREE.Vector3(PW/2,0.07,0),dims:[16.8,50,25.6],side:true,note:'Prosep de 16.8 (ancho) × 50 (alto) × 25.6 cm (largo/fondo), sobre parante al piso; despacho solo por la puerta lateral inferior'}
 };
-const cig={root:holder,setBase(b){Object.values(ALL).forEach(c=>c.setBase(b));}};
+let sc=1;
+const cig={root:holder,setBase(b){Object.values(ALL).forEach(c=>{c.root.scale.setScalar(sc); c.setBase(b/sc);});}};
+const Hm=()=>MODELS[model].h()*sc;
 function setModel(m){
   model=m; Object.entries(ALL).forEach(([k,c])=>c.root.visible=k===m);
   document.querySelectorAll('[data-model]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.model===m));
@@ -462,7 +469,7 @@ const markers={};
 let current=0, baseH=1.25;
 
 const $=id=>document.getElementById(id);
-function rackCenter(){ const v=MODELS[model].access().clone(); v.y+=baseH; return cig.root.localToWorld(v); }
+function rackCenter(){ const v=MODELS[model].access().clone().multiplyScalar(sc); v.y+=baseH; return cig.root.localToWorld(v); }
 function frontDir(){ return new THREE.Vector3(Math.sin(cig.root.rotation.y),0,Math.cos(cig.root.rotation.y)); }
 function customInfo(d){
   const f=frontDir();
@@ -492,7 +499,9 @@ function updateInfo(){
   const d=rackCenter().distanceTo(shoulder);
   $('vDist').textContent=d.toFixed(1)+' m';
   $('sDist').className='stat '+(d<=1.0?'ok':'warn');
-  const top=baseH+MODELS[model].h()-0.02;
+  const top=baseH+Hm()-0.02;
+  const dm=MODELS[model].dims.map(v=>(v*sc).toFixed(1).replace('.0',''));
+  $('dims').textContent=`Medida en pantalla: ${dm[0]} ancho × ${dm[1]} alto × ${dm[2]} fondo (cm)`+(sc!==1?' · escalada':'');
   $('vTop').textContent=top.toFixed(2)+' m';
   $('sTop').className='stat '+(top<=1.85?'ok':'warn');
   $('vVis').textContent=o.faces;
@@ -507,6 +516,7 @@ function setOption(n){
   document.querySelectorAll('[data-opt]').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.opt===n));
   updateInfo(); go(activeView);
 }
+$('sc').addEventListener('input',e=>{sc=+e.target.value; $('scOut').textContent=Math.round(sc*100)+'%'; cig.setBase(baseH); updateInfo();});
 $('hBase').addEventListener('input',e=>{baseH=+e.target.value; $('hOut').textContent=baseH.toFixed(2)+' m'; cig.setBase(baseH); updateInfo();});
 document.querySelectorAll('[data-opt]').forEach(b=>b.addEventListener('click',()=>setOption(+b.dataset.opt)));
 // ---------- Mover y girar ----------
@@ -571,7 +581,7 @@ scene.add(sun); scene.add(new THREE.AmbientLight(0xffffff,0.25));
 let activeView='general', tween=null;
 function viewFor(name){
   cig.root.updateMatrixWorld(true);
-  const hh=MODELS[model].h(); const c=new THREE.Vector3(cig.root.position.x,baseH+hh/2,cig.root.position.z);
+  const hh=Hm(); const c=new THREE.Vector3(cig.root.position.x,baseH+hh/2,cig.root.position.z);
   const f=frontDir(), side=new THREE.Vector3(f.z,0,-f.x);
   switch(name){
     case 'cliente': return {p:c.clone().addScaledVector(f,3.6).setY(1.6), t:c};
